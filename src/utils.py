@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 from torchvision import datasets, transforms
 
@@ -10,7 +11,7 @@ def load_dataset():
 
 def partition_dataset(dataset, num_clients):
     # TODO: partitionではなく、固定数（例えば6000枚）にする
-    size = len(dataset) // num_clients
+    size = 6000
     subsets = []
     for i in range(num_clients):
         #TODO: indices = list(range(i * size, (i + 1) * size))になおす
@@ -35,3 +36,13 @@ def create_backdoor_testloader(test_dataset, target_class, batch_size=64, device
             yield (batch[0].to(device), batch[1].to(device))
     else:
         yield from loader
+
+def corrcoef_numpy(x, y):
+    """
+    NumPy の corrcoef で相関行列をつくり、
+    [0,1] 成分を返す。
+    """
+    x_arr = np.array(x)
+    y_arr = np.array(y)
+    # 相関行列 [[1, r], [r, 1]] を返し、その [0,1] を取り出す
+    return np.corrcoef(x_arr, y_arr)[0, 1]

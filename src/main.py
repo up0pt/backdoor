@@ -8,7 +8,7 @@ import networkx as nx
 import torch
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
-from utils import load_dataset, partition_dataset
+from utils import load_dataset, partition_dataset, corrcoef_numpy
 from client import Client
 from fix_seed import fix_seeds
 from plot_utils import plot_pagerank_vs_accuracy
@@ -69,8 +69,8 @@ def select_attackers(G, args):
     return [node for node,_ in sorted(pr.items(), key=lambda x: x[1], reverse=True)[:k]]
 
 
-def average_weights(w1, w2):
-    return {k:(w1[k]+w2[k])/2.0 for k in w1}
+def average_weights(w1, wlist):
+    return {k:(w1[k]+sum([w[k] for w in wlist]))/(len(wlist) + 1) for k in w1}
 
 
 def clip_weights(weights, const):
@@ -157,6 +157,11 @@ def simulate(args):
         clients.append(Client(i,subsets[i],nb,device=args.device,malicious=is_m,pdr=args.pdr if is_m else 0))
 
     brs=[]; accs=[]
+    acc_clients = []
+    coef = []
+
+    client_pageranks = {i: pr_score for i, pr_score in enumerate(nx.pagerank(G).values())}
+    pagerank_list = [client_pageranks[i] for i in range(len(clients))]
     for r in range(1,args.rounds+1):
         log(f"--- Round {r} ---")
         for c in clients: 
@@ -168,11 +173,11 @@ def simulate(args):
                 w=clip_weights(w,args.clip_local)
             if c.malicious: 
                 w={k:v*args.boost for k,v in w.items()}
-            for nid in c.neighbors:
-                wn=clients[nid].get_weights()
-                if args.clip_global: 
-                    wn=clip_weights(wn,args.clip_global)
-                w=average_weights(w,wn) # TODO: これだと、後に追加する方が大きい。平均にするように。
+            wns=[clients[nid].get_weights() for nid in c.neighbors]
+            # TODO: 下のclipを追加する
+            # if args.clip_global: 
+            #     wn=clip_weights(wn,args.clip_global)
+            w=average_weights(w,wns) 
             new_w.append(w)
         for c,w in zip(clients,new_w): 
             c.set_weights(w)
@@ -181,12 +186,10 @@ def simulate(args):
         cs, acc_list=evaluate_clean_accuracy(clients,clean_loader)
         brs.append(bs)
         accs.append(cs)
-        client_pageranks = {i: pr_score for i, pr_score in enumerate(nx.pagerank(G).values())}
         client_accuracies = {i: acc for i, acc in enumerate(acc_list)}
-
-        pagerank_list = [client_pageranks[i] for i in range(len(clients))]
         accuracy_list = [client_accuracies[i] for i in range(len(clients))]
-
+        coef.append(corrcoef_numpy(pagerank_list, accuracy_list))
+        acc_clients.append(accuracy_list)
         plot_pagerank_vs_accuracy(pagerank_list, accuracy_list, os.path.join(run_dir,f'pagerank_vs_accuracy_{r}.png'))
         log(f"Attack FP rate: {bs:.2f}, Clean acc: {cs:.2f}")
 
@@ -194,10 +197,33 @@ def simulate(args):
     csvp=os.path.join(run_dir,args.output_csv)
     with open(csvp,'w',newline='') as f:
         wr=csv.writer(f)
-        wr.writerow(['round','attack_fp','test_acc'])
+        wr.writerow(pagerank_list)
+        for i, acces in enumerate(acc_clients, 1): 
+            wr.writerow(acces)
+    log(f"CSV saved to {csvp}")
+
+    # save CSV
+    csvp=os.path.join(run_dir, 'pagerank_accuracy.csv')
+    with open(csvp,'w',newline='') as f:
+        wr=csv.writer(f)
         for i,(bs,cs) in enumerate(zip(brs,accs),1): 
             wr.writerow([i,bs,cs])
     log(f"CSV saved to {csvp}")
+
+    # plot
+    plt.figure()
+    plt.plot(range(1,args.rounds+1),coef)
+    plt.xlabel('Round')
+    plt.ylabel('coef')
+    plt.title('coef between acc and pagerank')
+    plt.legend();plt.grid(True)
+    plt.xticks(range(1,args.rounds+1))
+    plt.ylim(-1.09, 1.09)
+    figp=os.path.join(run_dir,'coef.png')
+    plt.savefig(figp)
+    log(f"Figure saved to {figp}")
+    plt.show()
+    logf.close()
 
     # plot
     plt.figure()
