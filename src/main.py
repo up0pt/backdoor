@@ -150,7 +150,7 @@ def simulate(args):
     plt.title('Backdoor Success vs. Rounds')
     plt.grid(True)
     plt.show()
-    plt.savefig("plot.png")
+    plt.savefig("data/img/plot.png")
 
 if __name__ == '__main__':
     args = parse_args()
