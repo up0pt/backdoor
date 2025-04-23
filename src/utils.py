@@ -13,7 +13,8 @@ def partition_dataset(dataset, num_clients):
     size = len(dataset) // num_clients
     subsets = []
     for i in range(num_clients):
-        indices = list(range(i * size, (i + 1) * size))
+        #TODO: indices = list(range(i * size, (i + 1) * size))になおす
+        indices = list(range(0, size))
         subsets.append(torch.utils.data.Subset(dataset, indices))
     return subsets
 
