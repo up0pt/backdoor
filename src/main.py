@@ -8,7 +8,7 @@ import networkx as nx
 import torch
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
-from utils import load_dataset, partition_dataset, corrcoef_numpy
+from utils import load_dataset, assign_random_data_to_clients, corrcoef_numpy
 from client import Client
 from fix_seed import fix_seeds
 from plot_utils import plot_pagerank_vs_accuracy
@@ -141,7 +141,7 @@ def simulate(args):
     log(f"Device:{args.device},PDR:{args.pdr},Boost:{args.boost},ClipG:{args.clip_global},ClipL:{args.clip_local}")
 
     train,test=load_dataset()
-    subsets=partition_dataset(train,args.clients)
+    subsets=assign_random_data_to_clients(train,args.clients)
     clean_loader=DataLoader(test,batch_size=64,shuffle=False)
 
     G=build_topology(args)
@@ -219,9 +219,9 @@ def simulate(args):
     plt.legend();plt.grid(True)
     plt.xticks(range(1,args.rounds+1))
     plt.ylim(-1.09, 1.09)
-    figp=os.path.join(run_dir,'coef.png')
-    plt.savefig(figp)
-    log(f"Figure saved to {figp}")
+    coefp=os.path.join(run_dir,'coef.png')
+    plt.savefig(coefp)
+    log(f"Figure saved to {coefp}")
     plt.show()
     logf.close()
 

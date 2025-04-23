@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from torchvision import datasets, transforms
+import random
 
 def load_dataset():
     transform = transforms.Compose([transforms.ToTensor()])
@@ -17,6 +18,18 @@ def partition_dataset(dataset, num_clients):
         #TODO: indices = list(range(i * size, (i + 1) * size))になおす
         indices = list(range(0, size))
         subsets.append(torch.utils.data.Subset(dataset, indices))
+    return subsets
+
+def assign_random_data_to_clients(dataset, num_clients, samples_per_client=6000):
+    indices = list(range(len(dataset)))
+    subsets = []
+
+    for client_id in range(num_clients):
+        selected_indices = random.sample(indices, samples_per_client)
+        subsets.append(torch.utils.data.Subset(dataset, selected_indices))
+
+    print(f"subset is equal? {subsets_equal(subsets[0], subsets[1])}")
+
     return subsets
 
 
@@ -46,3 +59,21 @@ def corrcoef_numpy(x, y):
     y_arr = np.array(y)
     # 相関行列 [[1, r], [r, 1]] を返し、その [0,1] を取り出す
     return np.corrcoef(x_arr, y_arr)[0, 1]
+
+def subsets_equal(sub1, sub2, atol=1e-6):
+    # １）長さが同じか
+    if len(sub1) != len(sub2):
+        return False
+
+    # ２）全サンプルを順番に比較
+    for i in range(len(sub1)):
+        x1, y1 = sub1[i]
+        x2, y2 = sub2[i]
+        # テンソル部分は allclose で比較（浮動小数点誤差を許容）
+        if not torch.allclose(x1, x2, atol=atol):
+            return False
+        # ラベル部分は厳密一致
+        if y1 != y2:
+            return False
+
+    return True
