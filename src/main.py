@@ -129,6 +129,15 @@ def simulate(args):
     # save config
     with open(os.path.join(run_dir, 'args.json'), 'w') as f:
         json.dump(vars(args), f, indent=2)
+    # open log file
+    log_path = os.path.join(run_dir, 'log.txt')
+    log_file = open(log_path, 'w')
+    def log(msg):
+        print(msg)
+        log_file.write(msg + '\n')
+        log_file.flush()
+    # log initial settings
+    log(f"Device: {args.device}, PDR: {args.pdr}, Boost: {args.boost}, ClipGlobal: {args.clip_global}, ClipLocal: {args.clip_local}, CSV: {args.output_csv}")
 
     # load data
     train_set, test_set = load_dataset()
@@ -139,8 +148,8 @@ def simulate(args):
     # build topology and select attackers
     G = build_topology(args)
     attackers = set(select_attackers(G, args))
-    print(f"Topology: {args.topology}, edges: {G.number_of_edges()}")
-    print(f"Attackers (malicious clients): {sorted(attackers)}")
+    log(f"Topology: {args.topology}, edges: {G.number_of_edges()}")
+    log(f"Attackers (malicious clients): {sorted(attackers)}")
 
     # initialize clients
     clients = []
@@ -155,7 +164,7 @@ def simulate(args):
 
     # run rounds
     for r in range(1, args.rounds+1):
-        print(f"--- Round {r} ---")
+        log(f"--- Round {r} ---")
         for c in clients:
             c.train(epochs=1)
         new_weights = []
@@ -180,7 +189,7 @@ def simulate(args):
         cs = evaluate_clean_accuracy(clients, clean_loader)
         success_rates.append(bs)
         clean_accuracies.append(cs)
-        print(f"Backdoor success rate: {bs:.2f}, Clean test accuracy: {cs:.2f}")
+        log(f"Backdoor success rate: {bs:.2f}, Clean test accuracy: {cs:.2f}")
 
     # save CSV
     csv_path = os.path.join(run_dir, args.output_csv)
@@ -189,7 +198,7 @@ def simulate(args):
         writer.writerow(['round', 'backdoor_success', 'test_accuracy'])
         for i, (bs, cs) in enumerate(zip(success_rates, clean_accuracies), start=1):
             writer.writerow([i, bs, cs])
-    print(f"Results CSV saved to {csv_path}")
+    log(f"Results CSV saved to {csv_path}")
 
     # plot and save figure
     plt.figure()
@@ -202,11 +211,11 @@ def simulate(args):
     plt.grid(True)
     fig_path = os.path.join(run_dir, 'metrics.png')
     plt.savefig(fig_path)
-    print(f"Figure saved to {fig_path}")
+    log(f"Figure saved to {fig_path}")
     plt.show()
 
+    log_file.close()
 
 if __name__ == '__main__':
     args = parse_args()
-    print(f"Device: {args.device}, PDR: {args.pdr}, Boost: {args.boost}, ClipGlobal: {args.clip_global}, ClipLocal: {args.clip_local}, CSV: {args.output_csv}")
     simulate(args)
