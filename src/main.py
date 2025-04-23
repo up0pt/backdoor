@@ -1,8 +1,10 @@
 import argparse
+import csv
 import numpy as np
 import networkx as nx
 import torch
 import matplotlib.pyplot as plt
+from torch.utils.data import DataLoader
 from utils import load_dataset, partition_dataset, create_backdoor_testloader
 from client import Client
 
@@ -29,6 +31,8 @@ def parse_args():
                         help='clipping constant for received models')
     parser.add_argument('--clip_local', type=float, default=None,
                         help='clipping constant for own model')
+    parser.add_argument('--output_csv', type=str, default='results.csv',
+                        help='CSV file to store metrics')
     parser.add_argument('--device', type=str,
                         default='cuda' if torch.cuda.is_available() else 'cpu',
                         help='compute device')
@@ -101,25 +105,48 @@ def evaluate_backdoor_success(clients, backdoor_loader):
     return sum(rates) / len(rates)
 
 
+def evaluate_clean_accuracy(clients, clean_loader):
+    accs = []
+    for c in clients:
+        c.model.eval()
+        correct = total = 0
+        with torch.no_grad():
+            for data, target in clean_loader:
+                data, target = data.to(c.device), target.to(c.device)
+                pred = c.model(data).argmax(dim=1)
+                correct += (pred == target).sum().item()
+                total += target.size(0)
+        accs.append(correct / total)
+    return sum(accs) / len(accs)
+
+
 def simulate(args):
+    # load data
     train_set, test_set = load_dataset()
     subsets = partition_dataset(train_set, args.clients)
     backdoor_loader = list(create_backdoor_testloader(test_set, target_class=7, batch_size=64, device=args.device))
+    clean_loader = DataLoader(test_set, batch_size=64, shuffle=False)
 
+    # build topology and select attackers
     G = build_topology(args)
     attackers = set(select_attackers(G, args))
     print(f"Topology: {args.topology}, edges: {G.number_of_edges()}")
     print(f"Attackers (malicious clients): {sorted(attackers)}")
 
+    # initialize clients
     clients = []
     for i in range(args.clients):
         is_mal = (i in attackers)
         neighbors = list(G.neighbors(i))
         clients.append(Client(i, subsets[i], neighbors, device=args.device, malicious=is_mal, pdr=args.pdr if is_mal else 0.0))
 
+    # metrics storage
     success_rates = []
-    for r in range(args.rounds):
-        print(f"--- Round {r+1} ---")
+    clean_accuracies = []
+
+    # run rounds
+    for r in range(1, args.rounds+1):
+        print(f"--- Round {r} ---")
         for c in clients:
             c.train(epochs=1)
         new_weights = []
@@ -138,10 +165,26 @@ def simulate(args):
             new_weights.append(own)
         for c, w in zip(clients, new_weights):
             c.set_weights(w)
-        rate = evaluate_backdoor_success(clients, backdoor_loader)
-        success_rates.append(rate)
-        print(f"Backdoor success rate: {rate:.2f}")
 
+        # evaluate
+        bs = evaluate_backdoor_success(clients, backdoor_loader)
+        cs = evaluate_clean_accuracy(clients, clean_loader)
+        success_rates.append(bs)
+        clean_accuracies.append(cs)
+        print(f"Backdoor success rate: {bs:.2f}, Clean test accuracy: {cs:.2f}")
+
+    # save to CSV
+    with open(args.output_csv, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['round', 'backdoor_success', 'test_accuracy'])
+        for i, (bs, cs) in enumerate(zip(success_rates, clean_accuracies), start=1):
+            writer.writerow([i, bs, cs])
+    print(f"Results saved to {args.output_csv}")
+
+    # ディレクトリがなければ作成
+    save_dir = "data/imag"
+    os.makedirs(save_dir, exist_ok=True)
+    save_path = os.path.join(save_dir, "figure.png")
     plt.figure()
     plt.plot(range(1, args.rounds+1), success_rates)
     plt.xticks(range(1, args.rounds+1))
@@ -149,8 +192,8 @@ def simulate(args):
     plt.ylabel('Backdoor Success Rate')
     plt.title('Backdoor Success vs. Rounds')
     plt.grid(True)
-    plt.show()
-    plt.savefig("data/img/plot.png")
+    plt.savefig(save_path)
+    plt.close()
 
 if __name__ == '__main__':
     args = parse_args()
