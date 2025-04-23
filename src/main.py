@@ -95,11 +95,15 @@ def evaluate_clean_accuracy(clients, clean_loader):
         c.model.eval()
         correct=total=0
         device=c.device
+        if c.malicious:
+            continue
         with torch.no_grad():
             for data,label in clean_loader:
-                d=data.to(device); l=label.to(device)
+                d=data.to(device)
+                l=label.to(device)
                 pred=c.model(d).argmax(dim=1)
-                correct+=(pred==l).sum().item(); total+=l.size(0)
+                correct+=(pred==l).sum().item()
+                total+=l.size(0)
         accs.append(correct/total)
     return sum(accs)/len(accs)
 
