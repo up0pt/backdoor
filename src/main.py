@@ -106,11 +106,17 @@ def evaluate_clean_accuracy(clients, clean_loader):
 
 def simulate(args):
     # setup
-    base='results'; ts=datetime.now().strftime('%Y%m%d_%H%M%S')
-    run_dir=os.path.join(base,ts); os.makedirs(run_dir,exist_ok=True)
-    with open(os.path.join(run_dir,'args.json'),'w') as f: json.dump(vars(args),f,indent=2)
+    base='results'
+    ts=datetime.now().strftime('%Y%m%d_%H%M%S')
+    run_dir=os.path.join(base,ts)
+    os.makedirs(run_dir,exist_ok=True)
+    with open(os.path.join(run_dir,'args.json'),'w') as f: 
+        json.dump(vars(args),f,indent=2)
     logf=open(os.path.join(run_dir,'log.txt'),'w')
-    def log(m): print(m); logf.write(m+'\n'); logf.flush()
+    def log(m): 
+        print(m)
+        logf.write(m+'\n')
+        logf.flush()
     log(f"Device:{args.device},PDR:{args.pdr},Boost:{args.boost},ClipG:{args.clip_global},ClipL:{args.clip_local}")
 
     train,test=load_dataset()
@@ -135,32 +141,47 @@ def simulate(args):
         new_w=[]
         for c in clients:
             w=c.get_weights()
-            if args.clip_local: w=clip_weights(w,args.clip_local)
-            if c.malicious: w={k:v*args.boost for k,v in w.items()}
+            if args.clip_local: 
+                w=clip_weights(w,args.clip_local)
+            if c.malicious: 
+                w={k:v*args.boost for k,v in w.items()}
             for nid in c.neighbors:
                 wn=clients[nid].get_weights()
-                if args.clip_global: wn=clip_weights(wn,args.clip_global)
+                if args.clip_global: 
+                    wn=clip_weights(wn,args.clip_global)
                 w=average_weights(w,wn)
             new_w.append(w)
-        for c,w in zip(clients,new_w): c.set_weights(w)
+        for c,w in zip(clients,new_w): 
+            c.set_weights(w)
 
         bs=evaluate_attack_success(clients,test,7)
         cs=evaluate_clean_accuracy(clients,clean_loader)
-        brs.append(bs); accs.append(cs)
+        brs.append(bs)
+        accs.append(cs)
         log(f"Attack FP rate: {bs:.2f}, Clean acc: {cs:.2f}")
 
     # save CSV
     csvp=os.path.join(run_dir,args.output_csv)
     with open(csvp,'w',newline='') as f:
-        wr=csv.writer(f); wr.writerow(['round','attack_fp','test_acc'])
-        for i,(bs,cs) in enumerate(zip(brs,accs),1): wr.writerow([i,bs,cs])
+        wr=csv.writer(f)
+        wr.writerow(['round','attack_fp','test_acc'])
+        for i,(bs,cs) in enumerate(zip(brs,accs),1): 
+            wr.writerow([i,bs,cs])
     log(f"CSV saved to {csvp}")
 
     # plot
-    plt.figure(); plt.plot(range(1,args.rounds+1),brs,label='Attack FP')
+    plt.figure()
+    plt.plot(range(1,args.rounds+1),brs,label='Attack FP')
     plt.plot(range(1,args.rounds+1),accs,label='Clean Acc')
-    plt.xlabel('Round');plt.ylabel('Rate');plt.title('Attack FP & Test Acc');plt.legend();plt.grid(True)
-    figp=os.path.join(run_dir,'metrics.png'); plt.savefig(figp)
-    log(f"Figure saved to {figp}"); plt.show(); logf.close()
+    plt.xlabel('Round')
+    plt.ylabel('Rate')
+    plt.title('Attack FP & Test Acc')
+    plt.legend();plt.grid(True)
+    plt.xticks(rounds)
+    figp=os.path.join(run_dir,'metrics.png')
+    plt.savefig(figp)
+    log(f"Figure saved to {figp}")
+    plt.show()
+    logf.close()
 
 if __name__=='__main__': args=parse_args(); simulate(args)
