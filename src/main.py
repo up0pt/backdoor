@@ -74,9 +74,10 @@ def average_weights(w1, w2):
 
 def clip_weights(weights, const):
     clipped = {}
+    norms = {k: v.norm(p=2).item() for k, v in weights.items()}
+    norm_all = np.linalg.norm(list(norms.values()), ord = 2)
+    factor = max(1.0, norm_all/const)
     for k,v in weights.items():
-        norm = torch.norm(v)
-        factor = max(1.0, (norm/const).item())
         clipped[k] = v/factor
     return clipped
 
@@ -122,7 +123,6 @@ def evaluate_clean_accuracy(clients, clean_loader):
         accs.append(correct/total)
     return sum(accs)/len(accs)
 
-
 def simulate(args):
     # setup
     fix_seeds(args.seed)
@@ -158,7 +158,8 @@ def simulate(args):
     brs=[]; accs=[]
     for r in range(1,args.rounds+1):
         log(f"--- Round {r} ---")
-        for c in clients: c.train(1)
+        for c in clients: 
+            c.train(epochs = 1)
         new_w=[]
         for c in clients:
             w=c.get_weights()
@@ -166,12 +167,11 @@ def simulate(args):
                 w=clip_weights(w,args.clip_local)
             if c.malicious: 
                 w={k:v*args.boost for k,v in w.items()}
-            else:
-                for nid in c.neighbors:
-                    wn=clients[nid].get_weights()
-                    if args.clip_global: 
-                        wn=clip_weights(wn,args.clip_global)
-                    w=average_weights(w,wn)
+            for nid in c.neighbors:
+                wn=clients[nid].get_weights()
+                if args.clip_global: 
+                    wn=clip_weights(wn,args.clip_global)
+                w=average_weights(w,wn) # TODO: これだと、後に追加する方が大きい。平均にするように。
             new_w.append(w)
         for c,w in zip(clients,new_w): 
             c.set_weights(w)
