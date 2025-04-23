@@ -177,11 +177,13 @@ def simulate(args):
     plt.ylabel('Rate')
     plt.title('Attack FP & Test Acc')
     plt.legend();plt.grid(True)
-    plt.xticks(rounds)
+    plt.xticks(range(1,args.rounds+1))
     figp=os.path.join(run_dir,'metrics.png')
     plt.savefig(figp)
     log(f"Figure saved to {figp}")
     plt.show()
     logf.close()
 
-if __name__=='__main__': args=parse_args(); simulate(args)
+if __name__=='__main__': 
+    args=parse_args()
+    simulate(args)
