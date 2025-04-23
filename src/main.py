@@ -1,5 +1,8 @@
 import argparse
+import os
 import csv
+import json
+from datetime import datetime
 import numpy as np
 import networkx as nx
 import torch
@@ -32,7 +35,7 @@ def parse_args():
     parser.add_argument('--clip_local', type=float, default=None,
                         help='clipping constant for own model')
     parser.add_argument('--output_csv', type=str, default='results.csv',
-                        help='CSV file to store metrics')
+                        help='CSV file name to store metrics')
     parser.add_argument('--device', type=str,
                         default='cuda' if torch.cuda.is_available() else 'cpu',
                         help='compute device')
@@ -66,10 +69,7 @@ def build_topology(args):
 
 def select_attackers(G, args):
     n = args.clients
-    if args.num_attackers is not None:
-        k = min(args.num_attackers, n)
-    else:
-        k = max(1, int(args.attacker_ratio * n))
+    k = args.num_attackers if args.num_attackers is not None else max(1, int(args.attacker_ratio * n))
     if args.attack_selection == 'random':
         rng = np.random.RandomState(args.seed)
         return list(rng.choice(n, size=k, replace=False))
@@ -121,6 +121,15 @@ def evaluate_clean_accuracy(clients, clean_loader):
 
 
 def simulate(args):
+    # setup experiment directory
+    base_dir = 'results'
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    run_dir = os.path.join(base_dir, timestamp)
+    os.makedirs(run_dir, exist_ok=True)
+    # save config
+    with open(os.path.join(run_dir, 'args.json'), 'w') as f:
+        json.dump(vars(args), f, indent=2)
+
     # load data
     train_set, test_set = load_dataset()
     subsets = partition_dataset(train_set, args.clients)
@@ -173,29 +182,31 @@ def simulate(args):
         clean_accuracies.append(cs)
         print(f"Backdoor success rate: {bs:.2f}, Clean test accuracy: {cs:.2f}")
 
-    # save to CSV
-    with open(args.output_csv, 'w', newline='') as f:
+    # save CSV
+    csv_path = os.path.join(run_dir, args.output_csv)
+    with open(csv_path, 'w', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(['round', 'backdoor_success', 'test_accuracy'])
         for i, (bs, cs) in enumerate(zip(success_rates, clean_accuracies), start=1):
             writer.writerow([i, bs, cs])
-    print(f"Results saved to {args.output_csv}")
+    print(f"Results CSV saved to {csv_path}")
 
-    # ディレクトリがなければ作成
-    save_dir = "data/imag"
-    os.makedirs(save_dir, exist_ok=True)
-    save_path = os.path.join(save_dir, "figure.png")
+    # plot and save figure
     plt.figure()
-    plt.plot(range(1, args.rounds+1), success_rates)
-    plt.xticks(range(1, args.rounds+1))
+    plt.plot(range(1, args.rounds+1), success_rates, label='Backdoor Success')
+    plt.plot(range(1, args.rounds+1), clean_accuracies, label='Clean Accuracy')
     plt.xlabel('Round')
-    plt.ylabel('Backdoor Success Rate')
-    plt.title('Backdoor Success vs. Rounds')
+    plt.ylabel('Rate')
+    plt.title('Backdoor Success and Test Accuracy by Round')
+    plt.legend()
     plt.grid(True)
-    plt.savefig(save_path)
-    plt.close()
+    fig_path = os.path.join(run_dir, 'metrics.png')
+    plt.savefig(fig_path)
+    print(f"Figure saved to {fig_path}")
+    plt.show()
+
 
 if __name__ == '__main__':
     args = parse_args()
-    print(f"Device: {args.device}, PDR: {args.pdr}, Boost: {args.boost}, ClipGlobal: {args.clip_global}, ClipLocal: {args.clip_local}")
+    print(f"Device: {args.device}, PDR: {args.pdr}, Boost: {args.boost}, ClipGlobal: {args.clip_global}, ClipLocal: {args.clip_local}, CSV: {args.output_csv}")
     simulate(args)
