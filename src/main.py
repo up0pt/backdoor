@@ -30,6 +30,7 @@ def parse_args():
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--k', type=int, default=2)
     parser.add_argument('--m', type=int, default=2)
+    parser.add_argument('--graph_path', type=str, default='graph.png')
     return parser.parse_args()
 
 
@@ -42,6 +43,18 @@ def build_topology(args):
     if args.topology == 'watts': return nx.watts_strogatz_graph(n, k=args.k, p=0.1, seed=seed)
     if args.topology == 'barabasi': return nx.barabasi_albert_graph(n, args.m, seed=seed)
     raise ValueError('Unknown topology')
+
+def save_topology(topo, run_dir, rel_path):
+    pos = nx.spring_layout(topo)
+    fig, ax = plt.subplots(figsize=(8, 6))  # figsize は任意で調整
+
+    # グラフを ax に描画
+    nx.draw(topo, pos=pos, ax=ax, with_labels=True, node_size=50)
+
+    # 図をファイルに保存
+    path = os.path.join(run_dir, rel_path)
+    fig.savefig(path, dpi=300, bbox_inches="tight")
+
 
 
 def select_attackers(G, args):
@@ -128,6 +141,7 @@ def simulate(args):
     clean_loader=DataLoader(test,batch_size=64,shuffle=False)
 
     G=build_topology(args)
+    save_topology(G, run_dir, args.graph_path)
     attackers=set(select_attackers(G,args))
     log(f"Topology:{args.topology},edges:{G.number_of_edges()}")
     log(f"Attackers:{sorted(attackers)}")
@@ -182,7 +196,7 @@ def simulate(args):
     plt.title('Attack FP & Test Acc')
     plt.legend();plt.grid(True)
     plt.xticks(range(1,args.rounds+1))
-    plt.ylim(0, 1)
+    plt.ylim(0, 1.09)
     figp=os.path.join(run_dir,'metrics.png')
     plt.savefig(figp)
     log(f"Figure saved to {figp}")
