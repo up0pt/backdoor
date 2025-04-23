@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader
 from utils import load_dataset, partition_dataset
 from client import Client
 from fix_seed import fix_seeds
+from plot_utils import plot_pagerank_vs_accuracy
 
 
 def parse_args():
@@ -121,7 +122,7 @@ def evaluate_clean_accuracy(clients, clean_loader):
                 correct+=(pred==l).sum().item()
                 total+=l.size(0)
         accs.append(correct/total)
-    return sum(accs)/len(accs)
+    return sum(accs)/len(accs), accs
 
 def simulate(args):
     # setup
@@ -177,9 +178,16 @@ def simulate(args):
             c.set_weights(w)
 
         bs=evaluate_attack_success(clients,test,7)
-        cs=evaluate_clean_accuracy(clients,clean_loader)
+        cs, acc_list=evaluate_clean_accuracy(clients,clean_loader)
         brs.append(bs)
         accs.append(cs)
+        client_pageranks = {i: pr_score for i, pr_score in enumerate(nx.pagerank(G).values())}
+        client_accuracies = {i: acc for i, acc in enumerate(acc_list)}
+
+        pagerank_list = [client_pageranks[i] for i in range(len(clients))]
+        accuracy_list = [client_accuracies[i] for i in range(len(clients))]
+
+        plot_pagerank_vs_accuracy(pagerank_list, accuracy_list, os.path.join(run_dir,f'pagerank_vs_accuracy_{r}.png'))
         log(f"Attack FP rate: {bs:.2f}, Clean acc: {cs:.2f}")
 
     # save CSV
