@@ -9,6 +9,7 @@ def load_dataset():
 
 
 def partition_dataset(dataset, num_clients):
+    # TODO: partitionではなく、固定数（例えば6000枚）にする
     size = len(dataset) // num_clients
     subsets = []
     for i in range(num_clients):
