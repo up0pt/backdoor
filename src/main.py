@@ -182,6 +182,7 @@ def simulate(args):
     plt.title('Attack FP & Test Acc')
     plt.legend();plt.grid(True)
     plt.xticks(range(1,args.rounds+1))
+    plt.ylim(0, 1)
     figp=os.path.join(run_dir,'metrics.png')
     plt.savefig(figp)
     log(f"Figure saved to {figp}")
