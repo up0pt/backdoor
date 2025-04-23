@@ -10,17 +10,18 @@ import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 from utils import load_dataset, partition_dataset
 from client import Client
+from fix_seed import fix_seeds
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description='DFL Backdoor Attack Simulation')
     parser.add_argument('--clients', type=int, default=5)
     grp = parser.add_mutually_exclusive_group()
-    grp.add_argument('--num_attackers', type=int)
-    grp.add_argument('--attacker_ratio', type=float, default=0.2)
+    grp.add_argument('--num_attackers', type=int, default=0)
+    grp.add_argument('--attacker_ratio', type=float, default=0)
     parser.add_argument('--attack_selection', type=str, default='random', choices=['random','pagerank'])
     parser.add_argument('--rounds', type=int, default=10)
-    parser.add_argument('--pdr', type=float, default=0.3)
+    parser.add_argument('--pdr', type=float, default=0)
     parser.add_argument('--boost', type=float, default=1.0)
     parser.add_argument('--clip_global', type=float, default=None)
     parser.add_argument('--clip_local', type=float, default=None)
@@ -106,7 +107,8 @@ def evaluate_clean_accuracy(clients, clean_loader):
     accs=[]
     for c in clients:
         c.model.eval()
-        correct=total=0
+        correct=0
+        total=0
         device=c.device
         if c.malicious:
             continue
@@ -123,6 +125,7 @@ def evaluate_clean_accuracy(clients, clean_loader):
 
 def simulate(args):
     # setup
+    fix_seeds(args.seed)
     base='results'
     ts=datetime.now().strftime('%Y%m%d_%H%M%S')
     run_dir=os.path.join(base,ts)
@@ -163,11 +166,12 @@ def simulate(args):
                 w=clip_weights(w,args.clip_local)
             if c.malicious: 
                 w={k:v*args.boost for k,v in w.items()}
-            for nid in c.neighbors:
-                wn=clients[nid].get_weights()
-                if args.clip_global: 
-                    wn=clip_weights(wn,args.clip_global)
-                w=average_weights(w,wn)
+            else:
+                for nid in c.neighbors:
+                    wn=clients[nid].get_weights()
+                    if args.clip_global: 
+                        wn=clip_weights(wn,args.clip_global)
+                    w=average_weights(w,wn)
             new_w.append(w)
         for c,w in zip(clients,new_w): 
             c.set_weights(w)

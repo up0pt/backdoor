@@ -3,7 +3,7 @@ import torch.nn as nn
 from model import CNN
 
 class Client:
-    def __init__(self, cid, dataset, neighbors, device='cpu', malicious=False, pdr=1.0):
+    def __init__(self, cid, dataset, neighbors, device='cpu', malicious=False, pdr=0):
         self.id = cid
         self.device = torch.device(device)
         self.loader = torch.utils.data.DataLoader(dataset, batch_size=32, shuffle=True)
