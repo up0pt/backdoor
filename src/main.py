@@ -4,6 +4,7 @@ import os
 import csv
 import json
 from datetime import datetime
+import math
 import numpy as np
 import networkx as nx
 import torch
@@ -155,6 +156,7 @@ def evaluate_clean_accuracy(clients, clean_loader):
         total=0
         device=c.device
         if c.malicious:
+            accs.append(float('nan'))
             continue
         with torch.no_grad():
             for data,label in clean_loader:
@@ -164,7 +166,8 @@ def evaluate_clean_accuracy(clients, clean_loader):
                 correct+=(pred==l).sum().item()
                 total+=l.size(0)
         accs.append(correct/total)
-    return sum(accs)/len(accs), accs
+    without_none = [a for a in accs if not math.isnan(a)]
+    return sum(without_none)/len(without_none), accs
 
 def simulate(args):
     # setup
@@ -214,6 +217,7 @@ def simulate(args):
             if args.clip_local: 
                 w=clip_weights(w,args.clip_local)
             if c.malicious: 
+                 # TODO: 攻撃者の重みの更新はこれであっているのか？
                 w={k:v*args.boost for k,v in w.items()}
             wns=[clients[nid].get_weights() for nid in c.neighbors]
             # TODO: 下のclipを追加する
@@ -229,6 +233,7 @@ def simulate(args):
         brs.append(bs)
         accs.append(cs)
         client_accuracies = {i: acc for i, acc in enumerate(acc_list)}
+        print(client_accuracies)
         accuracy_list = [client_accuracies[i] for i in range(len(clients))]
         coef.append(corrcoef_numpy(pagerank_list, accuracy_list))
         acc_clients.append(accuracy_list)

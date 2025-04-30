@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import torch
 from torchvision import datasets, transforms
 import random
@@ -58,10 +59,15 @@ def corrcoef_numpy(x, y):
     NumPy の corrcoef で相関行列をつくり、
     [0,1] 成分を返す。
     """
-    x_arr = np.array(x)
-    y_arr = np.array(y)
-    # 相関行列 [[1, r], [r, 1]] を返し、その [0,1] を取り出す
-    return np.corrcoef(x_arr, y_arr)[0, 1]
+    # pandasのDataFrameを作成
+    df = pd.DataFrame({'list1': x, 'list2': y})
+
+    # NaNを含む行を削除
+    df = df.dropna()
+
+    # 相関係数を計算
+    correlation = np.corrcoef(df['list1'], df['list2'])[0, 1]
+
 
 def subsets_equal(sub1, sub2, atol=1e-6):
     # １）長さが同じか
