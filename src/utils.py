@@ -20,12 +20,15 @@ def partition_dataset(dataset, num_clients):
         subsets.append(torch.utils.data.Subset(dataset, indices))
     return subsets
 
-def assign_random_data_to_clients(dataset, num_clients, samples_per_client=6000):
+def assign_random_data_to_clients(dataset, num_clients, samples_per_client=6000, sample_num_dict: dict[str, int] = {}):
     indices = list(range(len(dataset)))
     subsets = []
 
     for client_id in range(num_clients):
-        selected_indices = random.sample(indices, samples_per_client)
+        if str(client_id) in sample_num_dict:
+            selected_indices = random.sample(indices, sample_num_dict[str(client_id)])
+        else:
+            selected_indices = random.sample(indices, samples_per_client)
         subsets.append(torch.utils.data.Subset(dataset, selected_indices))
 
     print(f"subset is equal? {subsets_equal(subsets[0], subsets[1])}")
