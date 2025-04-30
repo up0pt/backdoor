@@ -10,6 +10,7 @@ import networkx as nx
 import torch
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
+import torch.nn.functional as F
 from utils import load_dataset, assign_random_data_to_clients, corrcoef_numpy
 from client import Client
 from fix_seed import fix_seeds
@@ -140,6 +141,7 @@ def evaluate_attack_success(clients, test_dataset, target_class, batch_size=64):
                 if not mask.any(): continue
                 x = data[mask].to(device)
                 # inject patch
+                # TODO: inject を別の関数に切り分ける
                 x[:, :, -2:, -2:] = 1.0
                 preds = c.model(x).argmax(dim=1)
                 fp += (preds == target_class).sum().item()
@@ -148,7 +150,7 @@ def evaluate_attack_success(clients, test_dataset, target_class, batch_size=64):
     return sum(rates)/len(rates)
 
 
-def evaluate_clean_accuracy(clients, clean_loader):
+def evaluate_clean_accuracy(clients, clean_loader):# 
     accs=[]
     for c in clients:
         c.model.eval()
@@ -239,6 +241,27 @@ def simulate(args):
         acc_clients.append(accuracy_list)
         plot_pagerank_vs_accuracy(pagerank_list, accuracy_list, os.path.join(run_dir,f'pagerank_vs_accuracy_{r}.png'))
         log(f"Attack FP rate: {bs:.2f}, Clean acc: {cs:.2f}")
+
+        # Cosine similarity graph
+        flat_weights=[]
+        for c in clients:
+            ws=c.get_weights()
+            flat=torch.cat([v.view(-1) for v in ws.values()])
+            flat_weights.append(flat)
+        edge_labels={}
+        for u,v in G.edges():
+            cos=F.cosine_similarity(flat_weights[u].to(args.device), flat_weights[v].to(args.device), dim=0).item()
+            edge_labels[(u,v)]=f"{cos:.2f}"
+        plt.figure()
+        pos=nx.spring_layout(G,seed=args.seed)
+        nx.draw(G,pos,with_labels=True,node_color='lightblue')
+        nx.draw_networkx_edge_labels(G,pos,edge_labels=edge_labels)
+        plt.title(f"Cosine Similarity Round {r}")
+        sim_path=os.path.join(run_dir, f"sim_round_{r}.png")
+        plt.savefig(sim_path)
+        log(f"Similarity graph saved to {sim_path}")
+        plt.close()
+
 
     # save CSV
     csvp=os.path.join(run_dir,args.output_csv)
