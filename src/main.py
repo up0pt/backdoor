@@ -1,4 +1,5 @@
 import argparse
+import ast
 import os
 import csv
 import json
@@ -33,6 +34,7 @@ def parse_args():
     parser.add_argument('--k', type=int, default=2)
     parser.add_argument('--m', type=int, default=2)
     parser.add_argument('--graph_path', type=str, default='graph.png')
+    parser.add_argument('--client_extra_data', type=json.loads, default='{}')
     return parser.parse_args()
 
 
@@ -47,13 +49,53 @@ def build_topology(args):
     raise ValueError('Unknown topology')
 
 def save_topology(topo, run_dir, rel_path):
+
+    # -----------------------------
+    # 1) PageRank を計算
+    # -----------------------------
+    pr = nx.pagerank(topo, alpha=0.85)
+
+    # -----------------------------
+    # 2) レイアウト＆ラベル位置調整
+    # -----------------------------
     pos = nx.spring_layout(topo)
-    fig, ax = plt.subplots(figsize=(8, 6))  # figsize は任意で調整
 
-    # グラフを ax に描画
-    nx.draw(topo, pos=pos, ax=ax, with_labels=True, node_size=50)
+    # ノードラベルを y 方向に少し上げるオフセット
+    label_offset = 0.03
+    label_pos = {
+        n: (x, y + label_offset)
+        for n, (x, y) in pos.items()
+    }
 
-    # 図をファイルに保存
+    # ラベル文字列：ID と PageRank を改行で結合
+    labels = {
+        n: f"{n}\n{pr[n]:.2f}"
+        for n in topo.nodes()
+    }
+
+    # -----------------------------
+    # 3) 描画
+    # -----------------------------
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    # ノード・エッジ
+    nx.draw_networkx_nodes(topo, pos=pos, ax=ax, node_size=100)
+    nx.draw_networkx_edges(topo, pos=pos, ax=ax, alpha=0.5)
+
+    # ラベル（少し上にオフセット）
+    nx.draw_networkx_labels(
+        topo,
+        pos=label_pos,
+        labels=labels,
+        font_size=10,
+        verticalalignment='bottom',  # ラベル文字をノード上部に寄せる
+    )
+
+    ax.set_axis_off()
+
+    # -----------------------------
+    # 4) ファイルに保存
+    # -----------------------------
     path = os.path.join(run_dir, rel_path)
     fig.savefig(path, dpi=300, bbox_inches="tight")
 
@@ -141,7 +183,7 @@ def simulate(args):
     log(f"Device:{args.device},PDR:{args.pdr},Boost:{args.boost},ClipG:{args.clip_global},ClipL:{args.clip_local}")
 
     train,test=load_dataset()
-    subsets=assign_random_data_to_clients(train,args.clients)
+    subsets=assign_random_data_to_clients(train,args.clients, sample_num_dict=args.client_extra_data)
     clean_loader=DataLoader(test,batch_size=64,shuffle=False)
 
     G=build_topology(args)
@@ -203,7 +245,7 @@ def simulate(args):
     log(f"CSV saved to {csvp}")
 
     # save CSV
-    csvp=os.path.join(run_dir, 'pagerank_accuracy.csv')
+    csvp=os.path.join(run_dir,'pagerank_accuracy.csv')
     with open(csvp,'w',newline='') as f:
         wr=csv.writer(f)
         for i,(bs,cs) in enumerate(zip(brs,accs),1): 
@@ -216,14 +258,13 @@ def simulate(args):
     plt.xlabel('Round')
     plt.ylabel('coef')
     plt.title('coef between acc and pagerank')
-    plt.legend();plt.grid(True)
+    plt.grid(True)
     plt.xticks(range(1,args.rounds+1))
     plt.ylim(-1.09, 1.09)
     coefp=os.path.join(run_dir,'coef.png')
     plt.savefig(coefp)
     log(f"Figure saved to {coefp}")
     plt.show()
-    logf.close()
 
     # plot
     plt.figure()
@@ -238,8 +279,8 @@ def simulate(args):
     figp=os.path.join(run_dir,'metrics.png')
     plt.savefig(figp)
     log(f"Figure saved to {figp}")
-    plt.show()
     logf.close()
+    plt.show()
 
 if __name__=='__main__': 
     args=parse_args()
