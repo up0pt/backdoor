@@ -11,8 +11,10 @@ class Client:
         self.neighbors = neighbors           # list of neighbor client indices
         self.malicious = malicious           # whether this client injects backdoor
         self.pdr = pdr                       # Poisoned Data Ratio
+        self.grad = None
 
     def train(self, epochs=1):
+        old_params = {k: v.clone() for k, v in self.model.state_dict().items()}
         self.model.train()
         optimizer = torch.optim.SGD(self.model.parameters(), lr=0.01)
         criterion = nn.CrossEntropyLoss()
@@ -26,6 +28,8 @@ class Client:
                 loss = criterion(output, target)
                 loss.backward()
                 optimizer.step()
+        new_params = self.model.state_dict()
+        self.grad = {k: (new_params[k].cpu().detach().clone() - old_params[k].cpu().detach().clone()) for k in old_params}
 
     def inject_backdoor(self, data, target):
         batch_size = data.size(0)
@@ -37,6 +41,9 @@ class Client:
 
     def get_weights(self):
         return {k: v.cpu().detach().clone() for k, v in self.model.state_dict().items()}
-
+    
+    def get_grad(self):
+        return self.grad
+    
     def set_weights(self, state_dict):
         self.model.load_state_dict(state_dict)

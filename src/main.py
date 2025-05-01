@@ -19,6 +19,7 @@ from plot_utils import plot_pagerank_vs_accuracy
 
 def parse_args():
     parser = argparse.ArgumentParser(description='DFL Backdoor Attack Simulation')
+    parser.add_argument('--com_grad', type=bool, default=True)
     parser.add_argument('--clients', type=int, default=5)
     grp = parser.add_mutually_exclusive_group()
     grp.add_argument('--num_attackers', type=int, default=0)
@@ -116,6 +117,8 @@ def select_attackers(G, args):
 def average_weights(w1, wlist):
     return {k:(w1[k]+sum([w[k] for w in wlist]))/(len(wlist) + 1) for k in w1}
 
+def add_weights(w1, wdict: dict):
+    return {k:(v+wdict[k]) for k, v in w1.items()}
 
 def clip_weights(weights, const):
     clipped = {}
@@ -214,19 +217,37 @@ def simulate(args):
         for c in clients: 
             c.train(epochs = 1)
         new_w=[]
-        for c in clients:
-            w=c.get_weights()
-            if args.clip_local: 
-                w=clip_weights(w,args.clip_local)
-            if c.malicious: 
-                 # TODO: 攻撃者の重みの更新はこれであっているのか？
-                w={k:v*args.boost for k,v in w.items()}
-            wns=[clients[nid].get_weights() for nid in c.neighbors]
-            # TODO: 下のclipを追加する
-            # if args.clip_global: 
-            #     wn=clip_weights(wn,args.clip_global)
-            w=average_weights(w,wns) 
-            new_w.append(w)
+        if args.com_grad:
+            # w はgradient
+            for c in clients:
+                w=c.get_grad()
+                if args.clip_local: 
+                    w=clip_weights(w,args.clip_local)
+                if c.malicious: 
+                    # TODO: 攻撃者の重みの更新はこれであっているのか？
+                    w={k:v*args.boost for k,v in w.items()}
+                wns=[clients[nid].get_grad() for nid in c.neighbors]
+                # TODO: 下のclipを追加する
+                # if args.clip_global: 
+                #     wn=clip_weights(wn,args.clip_global)
+                grad_w=average_weights(w,wns)
+                weight = add_weights(c.get_weights(), grad_w)
+                new_w.append(weight)
+        else:
+            for c in clients:
+                w=c.get_weights()
+                if args.clip_local: 
+                    w=clip_weights(w,args.clip_local)
+                if c.malicious: 
+                    # TODO: 攻撃者の重みの更新はこれであっているのか？
+                    w={k:v*args.boost for k,v in w.items()}
+                wns=[clients[nid].get_weights() for nid in c.neighbors]
+                # TODO: 下のclipを追加する
+                # if args.clip_global: 
+                #     wn=clip_weights(wn,args.clip_global)
+                w=average_weights(w,wns) 
+                new_w.append(w)
+        # 同期して集約しているので、set_weightsを最後に行う。
         for c,w in zip(clients,new_w): 
             c.set_weights(w)
 
@@ -310,6 +331,6 @@ def simulate(args):
     logf.close()
     plt.show()
 
-if __name__=='__main__': 
+if __name__=='__main__': # 
     args=parse_args()
     simulate(args)
