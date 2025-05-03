@@ -13,11 +13,13 @@ class Client:
         self.pdr = pdr                       # Poisoned Data Ratio
         self.grad = None
 
-    def train(self, epochs=1):
+    def train(self, epochs=1, mal_epochs = 5):
         old_params = {k: v.clone() for k, v in self.model.state_dict().items()}
         self.model.train()
         optimizer = torch.optim.SGD(self.model.parameters(), lr=0.01)
         criterion = nn.CrossEntropyLoss()
+        if self.malicious:
+            epochs = mal_epochs
         for _ in range(epochs):
             for data, target in self.loader:
                 data, target = data.to(self.device), target.to(self.device)
