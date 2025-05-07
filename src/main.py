@@ -318,25 +318,15 @@ def simulate(args):
     """
 
     # plot
-    fig, ax = plt.subplots()
-    ax.plot(range(1,args.rounds+1),brs,label='Attack FP')
-    ax.plot(range(1,args.rounds+1),accs,label='Clean Acc')
-    ax.set_xlabel('Round')
-    ax.set_ylabel('Rate')
-    ax.set_title(f'Attack FP & Test Acc')
-    ax.legend()
-    ax.grid(True)
-    ax.set_ylim(0, 1.09)
-    # vars() を使うと Namespace → dict に変換できます
-    args_dict = vars(args)
-
-    # 改行区切りのテキストに整形
-    text = "\n".join(f"{k} = {v}" for k, v in args_dict.items())
-    ax.text(2, 2, f'{text}',
-        fontsize=12,       # フォントサイズ
-        color='black',       # 文字色
-        ha='right',        # horizontalalignment: 'left','center','right'
-        va='bottom') 
+    plt.figure()
+    plt.plot(range(1,args.rounds+1),brs,label='Attack FP')
+    plt.plot(range(1,args.rounds+1),accs,label='Clean Acc')
+    plt.xlabel('Round')
+    plt.ylabel('Rate')
+    plt.title('Attack FP & Test Acc')
+    plt.legend();plt.grid(True)
+    plt.xticks(range(1,args.rounds+1))
+    plt.ylim(0, 1.09)
     figp=os.path.join(run_dir,'metrics.png')
     plt.savefig(figp)
     log(f"Figure saved to {figp}")
