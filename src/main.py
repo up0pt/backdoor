@@ -228,8 +228,8 @@ def simulate(args):
                     w={k:v*args.boost for k,v in w.items()}
                 wns=[clients[nid].get_grad() for nid in c.neighbors]
                 # TODO: 下のclipを追加する
-                # if args.clip_global: 
-                #     wn=clip_weights(wn,args.clip_global)
+                if args.clip_global: 
+                    wns=[clip_weights(wn,args.clip_global) for wn in wns]
                 grad_w=average_weights(w,wns)
                 weight = add_weights(c.get_weights(), grad_w)
                 new_w.append(weight)
@@ -243,8 +243,8 @@ def simulate(args):
                     w={k:v*args.boost for k,v in w.items()}
                 wns=[clients[nid].get_weights() for nid in c.neighbors]
                 # TODO: 下のclipを追加する
-                # if args.clip_global: 
-                #     wn=clip_weights(wn,args.clip_global)
+                if args.clip_global: 
+                    wns=[clip_weights(wn,args.clip_global) for wn in wns]
                 w=average_weights(w,wns) 
                 new_w.append(w)
         # 同期して集約しているので、set_weightsを最後に行う。
@@ -302,6 +302,7 @@ def simulate(args):
     log(f"CSV saved to {csvp}")
 
     # plot
+    """
     plt.figure()
     plt.plot(range(1,args.rounds+1),coef)
     plt.xlabel('Round')
@@ -314,17 +315,28 @@ def simulate(args):
     plt.savefig(coefp)
     log(f"Figure saved to {coefp}")
     plt.show()
+    """
 
     # plot
-    plt.figure()
-    plt.plot(range(1,args.rounds+1),brs,label='Attack FP')
-    plt.plot(range(1,args.rounds+1),accs,label='Clean Acc')
-    plt.xlabel('Round')
-    plt.ylabel('Rate')
-    plt.title('Attack FP & Test Acc')
-    plt.legend();plt.grid(True)
-    plt.xticks(range(1,args.rounds+1))
-    plt.ylim(0, 1.09)
+    fig, ax = plt.subplots()
+    ax.plot(range(1,args.rounds+1),brs,label='Attack FP')
+    ax.plot(range(1,args.rounds+1),accs,label='Clean Acc')
+    ax.set_xlabel('Round')
+    ax.set_ylabel('Rate')
+    ax.set_title(f'Attack FP & Test Acc')
+    ax.legend()
+    ax.grid(True)
+    ax.set_ylim(0, 1.09)
+    # vars() を使うと Namespace → dict に変換できます
+    args_dict = vars(args)
+
+    # 改行区切りのテキストに整形
+    text = "\n".join(f"{k} = {v}" for k, v in args_dict.items())
+    ax.text(2, 2, f'{text}',
+        fontsize=12,       # フォントサイズ
+        color='black',       # 文字色
+        ha='right',        # horizontalalignment: 'left','center','right'
+        va='bottom') 
     figp=os.path.join(run_dir,'metrics.png')
     plt.savefig(figp)
     log(f"Figure saved to {figp}")
