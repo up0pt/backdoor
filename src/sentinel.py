@@ -77,7 +77,9 @@ def normalize_model(params_p: dict,
     return normalized
 
 
-def sentinel_aggregation(neighbor_params: dict,
+def sentinel_aggregation(
+                         client_id: int,
+                         neighbor_params: dict,
                          local_model: nn.Module,
                          loss_history: dict,
                          bootstrap_loader: torch.utils.data.DataLoader,
@@ -93,16 +95,11 @@ def sentinel_aggregation(neighbor_params: dict,
     ・bootstrap_loader, loss_fn: ブートストラップ検証用
     ・tau_S: 類似度フィルタ閾値, tau_L: 重み w の閾値
     """
-    # 現ラウンド番号は自身の履歴長
-    # assume local_id は loss_history のキーのひとつ
-    # ここでは、自身の ID を history にしか見えないキー i で扱う
-    # r = len(loss_history[i])
-    # 状況に応じて i（自身の client_id）を渡すよう改変してください
-    i = next(iter(loss_history.keys()))
-    r = len(loss_history[i])
+    i = client_id
 
     # local model のパラメータ
     M_dict = local_model.state_dict()
+    M_dict = {k: v.to(device) for k, v in M_dict.items()}
 
     # (1) Similarity filtering
     filtered = {}
@@ -110,9 +107,8 @@ def sentinel_aggregation(neighbor_params: dict,
         if j == i:
             continue
         # 隣接モデルのパラメータも同じ device に移動
-        Pj_d = {k: v.to(device) for k, v in Pj.items()}
-        M_dict_d = {k: v.to(device) for k, v in M_dict.items()}
-        S_j = cosine_similarity(Pj_d, M_dict_d)
+        Pj = {k: v.to(device) for k, v in Pj.items()}
+        S_j = cosine_similarity(Pj, M_dict)
         if S_j >= tau_S:
             filtered[j] = Pj
 
@@ -131,7 +127,7 @@ def sentinel_aggregation(neighbor_params: dict,
         w_j = map_loss_distance(loss_history[i], loss_history[j], tau_L, l_min)
         if w_j > 0:
             weights[j] = w_j
-
+    
     # (3) Layer normalization ＆ 重み付き平均
     # 正規化済み P̃ の準備
     normalized_P = {

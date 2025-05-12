@@ -249,7 +249,7 @@ def simulate(args):
 
     brs=[]; accs=[]
     acc_clients = []
-    loss_history = {c.id: [] for c in clients}
+    loss_history = {c.id: {client_id: [] for client_id in range(args.clients)} for c in clients}
     coef = []
 
     client_pageranks = {i: pr_score for i, pr_score in enumerate(nx.pagerank(G).values())}
@@ -278,9 +278,10 @@ def simulate(args):
                         neighbor_params[nid] = clients[nid].get_weights()
                     # Sentinel 集約
                     aggregated = sentinel_aggregation(
+                        c.id,
                         neighbor_params,
                         c.model,
-                        loss_history,
+                        loss_history[c.id],
                         c.bootstrap_loader,
                         nn.CrossEntropyLoss(),
                         tau_S=args.sentinel_s,
