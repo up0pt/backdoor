@@ -1,17 +1,16 @@
 #!/bin/bash
 #SBATCH --output=/home/members/nakadam/backdoor/jobs/job%j.out  # where to store the output (%j is the JOBID)
 #SBATCH --error=/home/members/nakadam/backdoor/jobs/job%j.err  # where to store error messages
-#SBATCH --mem=55G
+#SBATCH --mem=80G
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=8
 #SBATCH --gres=gpu:1
-#SBATCH --nodelist=ichibo
+#SBATCH --nodelist=liver
 
 clients=(30)
 attackers=(16)
-selections=(random)
-rounds=(40
-)
+selections=(pagerank)
+rounds=(40)
 pdr=(0.7)
 boost=(5)
 
@@ -43,7 +42,7 @@ for c in "${clients[@]}"; do
                         --topology   barabasi \
                         --seed    123 \
                         --m       3 \
-                        --sentinel
+                        # --sentinel
                     done
                 done
             done

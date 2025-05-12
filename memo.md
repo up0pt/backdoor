@@ -61,4 +61,17 @@ job 2294で40roundやってみる。
 Sentinelの効果をみるために、sentinel動作(job 2293)
 ![alt text](results/20250512_120246/metrics.png)
 なぜかSentinel入れても防御できていない...
+(31ebfeb91594dd2d272437cfe955254523a03ecb)
+Sentinel更新後（履歴のクライアントごと化）でもだめ
+![](results/20250512_142904/metrics.png)
+
+とりあえず、閾値を極端にしてクライアント自分自身のみでattackされないことを確認したい。
+
+
+#### 別軸でselectionをやっている。PageRankではどうなるか？
+job 2299
+
+
+
+
 
