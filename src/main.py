@@ -130,6 +130,15 @@ def clip_weights(weights, const):
     return clipped
 
 
+def inject_image_with_pattern(img):
+    img[:, :, -2, -2] = 1.0
+    img[:, :, -4, -2] = 1.0
+    img[:, :, -2, -4] = 1.0
+    img[:, :, -3, -3] = 1.0
+
+def inject_image_with_big_p(img):
+    img[:, :, -10:, -10:] = 1.0
+
 def evaluate_attack_success(clients, test_dataset, target_class, batch_size=64):
     # false-positive rate: non-target samples misclassified as target
     loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
@@ -143,9 +152,9 @@ def evaluate_attack_success(clients, test_dataset, target_class, batch_size=64):
                 mask = (label != target_class)
                 if not mask.any(): continue
                 x = data[mask].to(device)
-                # inject patch
-                # TODO: inject を別の関数に切り分ける
-                x[:, :, -2:, -2:] = 1.0
+                # TODO: injectをどれにするか
+                # inject_image_with_pattern(x)
+                inject_image_with_big_p(x)
                 preds = c.model(x).argmax(dim=1)
                 fp += (preds == target_class).sum().item()
                 total += x.size(0)

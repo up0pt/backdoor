@@ -5,16 +5,14 @@
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=8
 #SBATCH --gres=gpu:1
-#CommentSBATCH --nodelist=heart  # you can specify nodes where the job should be run; Ditto
+#SBATCH --nodelist=liver  # you can specify nodes where the job should be run; Dittos
 
 clients=(30)
-attackers=(4)
+attackers=(16)
 selections=(random)
 rounds=(40)
 pdr=(0.7)
 boost=(5)
-g_clip=(0.0001 0.001 0.01 0.1)
-l_clip=(1)
 
 PROJECT_ROOT=/home/members/nakadam/backdoor
 
@@ -33,8 +31,8 @@ for c in "${clients[@]}"; do
             for r in "${rounds[@]}"; do
                 for p in "${pdr[@]}"; do
                     for b in "${boost[@]}"; do
-                        for gclip in "${g_clip[@]}"; do
-                            for lclip in "${l_clip[@]}"; do
+                        # for gclip in "${g_clip[@]}"; do
+                            # for lclip in "${l_clip[@]}"; do
                                 echo ">>> clients=$c, attackers=$a, selection=$s, rounds=$r, pdr=$p, boost=$b"
                                 uv run src/main.py \
                                 --clients  $c \
@@ -45,11 +43,9 @@ for c in "${clients[@]}"; do
                                 --boost   $b \
                                 --topology   barabasi \
                                 --seed    123 \
-                                --m       3 \
-                                --clip_global $gclip \
-                                --clip_local $lclip
-                            done
-                        done
+                                --m       3 
+                            # done
+                        # done
                     done
                 done
             done
