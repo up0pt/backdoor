@@ -3,11 +3,8 @@ import numpy as np
 import pytest
 import sys
 import os
-
-from main import clip_weights
-
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
-
+from main import clip_weights
 
 
 def assert_tensor_dict_allclose(d1, d2, tol=1e-6):

@@ -3,15 +3,23 @@ import torch.nn as nn
 from model import CNN
 
 class Client:
-    def __init__(self, cid, dataset, neighbors, device='cpu', malicious=False, pdr=0):
+    def __init__(self, cid, dataset, val_dataset, neighbors, device='cpu', malicious=False, pdr=0, seed_fixed=True):
         self.id = cid
         self.device = torch.device(device)
         self.loader = torch.utils.data.DataLoader(dataset, batch_size=32, shuffle=True)
-        self.model = CNN().to(self.device)
+        self.model = CNN(seed_fixed).to(self.device)
         self.neighbors = neighbors           # list of neighbor client indices
         self.malicious = malicious           # whether this client injects backdoor
         self.pdr = pdr                       # Poisoned Data Ratio
         self.grad = None
+        # 検証データからブートストラップ用データセットを作成
+        val_size = len(val_dataset)
+        # ブートストラップサイズ: 検証データの1/3 か 300 のいずれか大きい方（ただし上限は val_size）
+        bs_size = min(max(val_size // 3, 300), val_size)
+        # ランダムにサンプリング
+        indices = torch.randperm(val_size)[:bs_size].tolist()
+        bs_subset = torch.utils.data.Subset(val_dataset, indices)
+        self.bootstrap_loader = torch.utils.data.DataLoader(bs_subset, batch_size=32, shuffle=True)
 
     def train(self, epochs=1, mal_epochs = 5):
         old_params = {k: v.clone() for k, v in self.model.state_dict().items()}

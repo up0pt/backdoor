@@ -3,8 +3,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class CNN(nn.Module):
-    def __init__(self):
-        torch.manual_seed(42) 
+    def __init__(self, seed_fixed = True):
+        if seed_fixed:
+            torch.manual_seed(42)
+            print("fixed seed")
+            #TODO: 初期値は一致するべきだが、それ以外のシード値は関係ない。よって、初期値だけ共有して、シードの共通化はしなくていい。
+        else:
+            print("not constant seed")
         super(CNN, self).__init__()
         self.conv1 = nn.Conv2d(1, 10, kernel_size=5)
         self.conv2 = nn.Conv2d(10, 20, kernel_size=5)

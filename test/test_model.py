@@ -4,9 +4,8 @@ import pytest
 import sys
 import os
 
-from model import CNN
-
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
+from model import CNN
 
 @pytest.fixture
 def get_initial_models():

@@ -1,16 +1,17 @@
 #!/bin/bash
 #SBATCH --output=/home/members/nakadam/backdoor/jobs/job%j.out  # where to store the output (%j is the JOBID)
 #SBATCH --error=/home/members/nakadam/backdoor/jobs/job%j.err  # where to store error messages
-#SBATCH --mem=80G
+#SBATCH --mem=55G
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=8
 #SBATCH --gres=gpu:1
-#SBATCH --nodelist=liver  # you can specify nodes where the job should be run; Dittos
+#SBATCH --nodelist=ichibo
 
 clients=(30)
 attackers=(16)
 selections=(random)
-rounds=(40)
+rounds=(40
+)
 pdr=(0.7)
 boost=(5)
 
@@ -31,21 +32,18 @@ for c in "${clients[@]}"; do
             for r in "${rounds[@]}"; do
                 for p in "${pdr[@]}"; do
                     for b in "${boost[@]}"; do
-                        # for gclip in "${g_clip[@]}"; do
-                            # for lclip in "${l_clip[@]}"; do
-                                echo ">>> clients=$c, attackers=$a, selection=$s, rounds=$r, pdr=$p, boost=$b"
-                                uv run src/main.py \
-                                --clients  $c \
-                                --num_attackers  $a \
-                                --attack_selection  $s \
-                                --rounds  $r \
-                                --pdr     $p \
-                                --boost   $b \
-                                --topology   barabasi \
-                                --seed    123 \
-                                --m       3 
-                            # done
-                        # done
+                        echo ">>> clients=$c, attackers=$a, selection=$s, rounds=$r, pdr=$p, boost=$b"
+                        uv run src/main.py \
+                        --clients  $c \
+                        --num_attackers  $a \
+                        --attack_selection  $s \
+                        --rounds  $r \
+                        --pdr     $p \
+                        --boost   $b \
+                        --topology   barabasi \
+                        --seed    123 \
+                        --m       3 \
+                        --sentinel
                     done
                 done
             done

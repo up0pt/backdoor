@@ -8,22 +8,40 @@ import math
 import numpy as np
 import networkx as nx
 import torch
+import torch.nn as nn
+from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
+
+
 from utils import load_dataset, assign_random_data_to_clients, corrcoef_numpy
 from client import Client
 from fix_seed import fix_seeds
 from plot_utils import plot_pagerank_vs_accuracy
+from sentinel import sentinel_aggregation
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description='DFL Backdoor Attack Simulation')
-    parser.add_argument('--com_grad', type=bool, default=True)
+    parser.add_argument('--com_grad', action='store_true', default=True)
     parser.add_argument('--clients', type=int, default=5)
+    parser.add_argument('--model_seed_fix', action='store_true', default=False)
     grp = parser.add_mutually_exclusive_group()
     grp.add_argument('--num_attackers', type=int, default=0)
     grp.add_argument('--attacker_ratio', type=float, default=0)
+
+    grp_defense = parser.add_mutually_exclusive_group()
+    grp_defense.add_argument("--sentinel", action="store_true",
+                     help="Use Sentinel defense method", default=True)
+    grp_defense.add_argument("--lgclipping", action="store_true",
+                     help="Use local & global defense method", default = False)
+    
+    parser.add_argument('--sentinel_s', type=float, default=0.1,
+                        help='Similarity threshold for Sentinel')
+    parser.add_argument('--sentinel_l', type=float, default=0.5,
+                        help='Loss distance threshold for Sentinel')
+
     parser.add_argument('--attack_selection', type=str, default='random', choices=['random','pagerank'])
     parser.add_argument('--rounds', type=int, default=10)
     parser.add_argument('--pdr', type=float, default=0)
@@ -136,6 +154,9 @@ def inject_image_with_pattern(img):
     img[:, :, -2, -4] = 1.0
     img[:, :, -3, -3] = 1.0
 
+def inject_image_with_small_p(img):
+    img[:, :, -2:, -2:] = 1.0
+
 def inject_image_with_big_p(img):
     img[:, :, -10:, -10:] = 1.0
 
@@ -154,7 +175,7 @@ def evaluate_attack_success(clients, test_dataset, target_class, batch_size=64):
                 x = data[mask].to(device)
                 # TODO: injectをどれにするか
                 # inject_image_with_pattern(x)
-                inject_image_with_big_p(x)
+                inject_image_with_small_p(x)
                 preds = c.model(x).argmax(dim=1)
                 fp += (preds == target_class).sum().item()
                 total += x.size(0)
@@ -199,9 +220,11 @@ def simulate(args):
         logf.flush()
     log(f"Device:{args.device},PDR:{args.pdr},Boost:{args.boost},ClipG:{args.clip_global},ClipL:{args.clip_local}")
 
-    train,test=load_dataset()
-    subsets=assign_random_data_to_clients(train,args.clients, sample_num_dict=args.client_extra_data)
+    train_val, test = load_dataset()
+    train, valid = train_test_split(train_val, test_size=0.2, random_state=args.seed)
+    subsets=assign_random_data_to_clients(train, args.clients, sample_num_dict=args.client_extra_data)
     clean_loader=DataLoader(test,batch_size=64,shuffle=False)
+    boostrap_subsets=assign_random_data_to_clients(valid,args.clients)
 
     G=build_topology(args)
     save_topology(G, run_dir, args.graph_path)
@@ -213,10 +236,20 @@ def simulate(args):
     for i in range(args.clients):
         is_m=i in attackers
         nb=list(G.neighbors(i))
-        clients.append(Client(i,subsets[i],nb,device=args.device,malicious=is_m,pdr=args.pdr if is_m else 0))
+        clients.append(
+            Client(
+                i,
+                subsets[i],
+                boostrap_subsets[i],
+                nb,
+                device=args.device,
+                malicious=is_m,
+                pdr=args.pdr if is_m else 0,
+                seed_fixed=args.model_seed_fix))
 
     brs=[]; accs=[]
     acc_clients = []
+    loss_history = {c.id: [] for c in clients}
     coef = []
 
     client_pageranks = {i: pr_score for i, pr_score in enumerate(nx.pagerank(G).values())}
@@ -229,19 +262,46 @@ def simulate(args):
         if args.com_grad:
             # w はgradient
             for c in clients:
-                w=c.get_grad()
-                if args.clip_local: 
-                    w=clip_weights(w,args.clip_local)
-                if c.malicious: 
-                    # TODO: 攻撃者の重みの更新はこれであっているのか？
-                    w={k:v*args.boost for k,v in w.items()}
-                wns=[clients[nid].get_grad() for nid in c.neighbors]
-                # TODO: 下のclipを追加する
-                if args.clip_global: 
-                    wns=[clip_weights(wn,args.clip_global) for wn in wns]
-                grad_w=average_weights(w,wns)
-                weight = add_weights(c.get_weights(), grad_w)
-                new_w.append(weight)
+                if args.sentinel:
+                    if c.malicious: 
+                        w=c.get_grad()
+                        # TODO: 攻撃者の重みの更新はこれであっているのか？
+                        w={k:v*args.boost for k,v in w.items()}
+                        wns=[clients[nid].get_grad() for nid in c.neighbors]
+                        grad_w=average_weights(w,wns)
+                        weight = add_weights(c.get_weights(), grad_w)
+                        new_w.append(weight)
+                        continue
+                    # 各クライアントの重み(state_dict)を集める
+                    neighbor_params = {c.id: c.get_weights()}
+                    for nid in c.neighbors:
+                        neighbor_params[nid] = clients[nid].get_weights()
+                    # Sentinel 集約
+                    aggregated = sentinel_aggregation(
+                        neighbor_params,
+                        c.model,
+                        loss_history,
+                        c.bootstrap_loader,
+                        nn.CrossEntropyLoss(),
+                        tau_S=args.sentinel_s,
+                        tau_L=args.sentinel_l,
+                        device=torch.device(args.device)
+                    )
+                    new_w.append(aggregated)
+                elif args.lgcliping:
+                    w=c.get_grad()
+                    if args.clip_local: 
+                        w=clip_weights(w,args.clip_local)
+                    if c.malicious: 
+                        # TODO: 攻撃者の重みの更新はこれであっているのか？
+                        w={k:v*args.boost for k,v in w.items()}
+                    wns=[clients[nid].get_grad() for nid in c.neighbors]
+                    # TODO: 下のclipを追加する
+                    if args.clip_global: 
+                        wns=[clip_weights(wn,args.clip_global) for wn in wns]
+                    grad_w=average_weights(w,wns)
+                    weight = add_weights(c.get_weights(), grad_w)
+                    new_w.append(weight)
         else:
             for c in clients:
                 w=c.get_weights()

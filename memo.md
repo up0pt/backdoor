@@ -30,7 +30,7 @@ TODO:
 backdoorの印をよりでかくした．(job 2272)
 ```
 clients=30
-attackers=4
+attackers=16
 selection=random
 rounds=40
 pdr=0.7
@@ -41,10 +41,24 @@ Boost:5.0
 ClipG:0.0001
 ClipL:1.0
 ```
-とりあえずattackerを16にしてみた（防御できてるように見えたので。）results/20250512_010727
-
+とりあえずattackerを16にしてみた（防御手法なしで）results/20250512_010727
+![alt text](results/20250512_010727/metrics.png)
+→防御してないのに、収束してる（seedの固定による？）
+seed 固定していない防御なし・攻撃ありで確かめる。
+![alt text](results/20250512_075226/metrics.png)
+やっぱり収束してる。。。
 
 ---
 ### 2025/05/12
 
 Sentinel 実装！！
+
+Sentinel実装後、原点回帰の攻撃(job 2290)
+![alt text](results/20250512_102244/metrics.png)
+なぜか2*2の模様が強い。
+job 2294で40roundやってみる。
+
+Sentinelの効果をみるために、sentinel動作(job 2293)
+![alt text](results/20250512_120246/metrics.png)
+なぜかSentinel入れても防御できていない...
+
