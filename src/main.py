@@ -33,7 +33,7 @@ def parse_args():
 
     grp_defense = parser.add_mutually_exclusive_group()
     grp_defense.add_argument("--sentinel", action="store_true",
-                     help="Use Sentinel defense method", default=True)
+                     help="Use Sentinel defense method", default = False)
     grp_defense.add_argument("--lgclipping", action="store_true",
                      help="Use local & global defense method", default = False)
     
@@ -42,7 +42,7 @@ def parse_args():
     parser.add_argument('--sentinel_l', type=float, default=0.5,
                         help='Loss distance threshold for Sentinel')
 
-    parser.add_argument('--attack_selection', type=str, default='random', choices=['random','pagerank'])
+    parser.add_argument('--attack_selection', type=str, default='random', choices=['random','pagerank','rev_pagerank','degree','rev_degree'])
     parser.add_argument('--rounds', type=int, default=10)
     parser.add_argument('--pdr', type=float, default=0)
     parser.add_argument('--boost', type=float, default=1.0)
@@ -128,9 +128,22 @@ def select_attackers(G, args):
     if args.attack_selection == 'random':
         rng = np.random.RandomState(args.seed)
         return list(rng.choice(n, size=k, replace=False))
-    pr = nx.pagerank(G)
-    return [node for node,_ in sorted(pr.items(), key=lambda x: x[1], reverse=True)[:k]]
-
+    elif args.attack_selection == 'pagerank':
+        pr = nx.pagerank(G)
+        return [node for node,_ in sorted(pr.items(), key=lambda x: x[1], reverse=True)[:k]]
+    elif args.attack_selection == 'rev_pagerank':
+        pr = nx.pagerank(G)
+        return [node for node,_ in sorted(pr.items(), key=lambda x: x[1], reverse=False)[:k]] #昇順
+    elif args.attack_selection == 'degree':
+        # Compute degree for each node
+        degrees = dict(G.degree())
+        # Top k nodes by degree
+        top_k = heapq.nlargest(k, degrees, key=degrees.get)
+        return top_k
+    elif args.attack_selection == 'rev_degree':
+        degree = dict(G.degree())
+        bottom_k = heapq.nsmallest(k, degrees, key=degrees.get)
+        return bottom_k
 
 def average_weights(w1, wlist):
     return {k:(w1[k]+sum([w[k] for w in wlist]))/(len(wlist) + 1) for k in w1}
@@ -289,7 +302,7 @@ def simulate(args):
                         device=torch.device(args.device)
                     )
                     new_w.append(aggregated)
-                elif args.lgcliping:
+                elif args.lgclipping:
                     w=c.get_grad()
                     if args.clip_local: 
                         w=clip_weights(w,args.clip_local)
