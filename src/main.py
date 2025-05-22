@@ -13,6 +13,7 @@ from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
+import pyRAPL
 
 
 from utils import load_dataset, assign_random_data_to_clients, corrcoef_numpy
@@ -258,6 +259,7 @@ def simulate(args):
                 device=args.device,
                 malicious=is_m,
                 pdr=args.pdr if is_m else 0,
+                boost=args.boost if is_m else 0,
                 seed_fixed=args.model_seed_fix))
 
     brs=[]; accs=[]
@@ -278,8 +280,6 @@ def simulate(args):
                 if args.sentinel:
                     if c.malicious: 
                         w=c.get_grad()
-                        # TODO: 攻撃者の重みの更新はこれであっているのか？
-                        w={k:v*args.boost for k,v in w.items()}
                         wns=[clients[nid].get_grad() for nid in c.neighbors]
                         grad_w=average_weights(w,wns)
                         weight = add_weights(c.get_weights(), grad_w)
@@ -304,13 +304,9 @@ def simulate(args):
                     new_w.append(aggregated)
                 elif args.lgclipping:
                     w=c.get_grad()
+                    wns=[clients[nid].get_grad() for nid in c.neighbors]
                     if args.clip_local: 
                         w=clip_weights(w,args.clip_local)
-                    if c.malicious: 
-                        # TODO: 攻撃者の重みの更新はこれであっているのか？
-                        w={k:v*args.boost for k,v in w.items()}
-                    wns=[clients[nid].get_grad() for nid in c.neighbors]
-                    # TODO: 下のclipを追加する
                     if args.clip_global: 
                         wns=[clip_weights(wn,args.clip_global) for wn in wns]
                     grad_w=average_weights(w,wns)

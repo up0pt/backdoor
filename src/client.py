@@ -3,7 +3,7 @@ import torch.nn as nn
 from model import CNN
 
 class Client:
-    def __init__(self, cid, dataset, val_dataset, neighbors, device='cpu', malicious=False, pdr=0, seed_fixed=True):
+    def __init__(self, cid, dataset, val_dataset, neighbors, device='cpu', malicious=False, pdr=0, boost=5, seed_fixed=True):
         self.id = cid
         self.device = torch.device(device)
         self.loader = torch.utils.data.DataLoader(dataset, batch_size=32, shuffle=True)
@@ -12,6 +12,7 @@ class Client:
         self.malicious = malicious           # whether this client injects backdoor
         self.pdr = pdr                       # Poisoned Data Ratio
         self.grad = None
+        self.boost = boost
         # 検証データからブートストラップ用データセットを作成
         val_size = len(val_dataset)
         # ブートストラップサイズ: 検証データの1/3 か 300 のいずれか大きい方（ただし上限は val_size）
@@ -40,6 +41,8 @@ class Client:
                 optimizer.step()
         new_params = self.model.state_dict()
         self.grad = {k: (new_params[k].cpu().detach().clone() - old_params[k].cpu().detach().clone()) for k in old_params}
+        if self.malicious:
+            self.grad = {k:v*self.boost for k,v in self.grad.items()}
 
     def inject_backdoor(self, data, target):
         batch_size = data.size(0)

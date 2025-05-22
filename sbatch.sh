@@ -8,11 +8,11 @@
 #SBATCH --nodelist=liver
 
 clients=(30)
-attackers=(16)
+attackers=(6)
 selections=(pagerank)
-rounds=(40)
+rounds=(100)
 pdr=(0.7)
-boost=(5)
+boost=(10 20)
 
 PROJECT_ROOT=/home/members/nakadam/backdoor
 
@@ -31,18 +31,22 @@ for c in "${clients[@]}"; do
             for r in "${rounds[@]}"; do
                 for p in "${pdr[@]}"; do
                     for b in "${boost[@]}"; do
-                        echo ">>> clients=$c, attackers=$a, selection=$s, rounds=$r, pdr=$p, boost=$b"
-                        uv run src/main.py \
-                        --clients  $c \
-                        --num_attackers  $a \
-                        --attack_selection  $s \
-                        --rounds  $r \
-                        --pdr     $p \
-                        --boost   $b \
-                        --topology   barabasi \
-                        --seed    123 \
-                        --m       3 \
-                        # --sentinel
+                        # for sent_s in "${sentinel_s[@]}"; do
+                            # for sent_l in "${sentinel_l[@]}"; do
+                                echo ">>> clients=$c, attackers=$a, selection=$s, rounds=$r, pdr=$p, boost=$b"
+                                uv run src/main.py \
+                                --clients  $c \
+                                --num_attackers  $a \
+                                --attack_selection  $s \
+                                --rounds  $r \
+                                --pdr     $p \
+                                --boost   $b \
+                                --topology    barabasi\
+                                --seed    123 \
+                                --m       3 \
+                                --lgclipping
+                            # done
+                        # done
                     done
                 done
             done
