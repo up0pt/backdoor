@@ -13,7 +13,6 @@ from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
-import pyRAPL
 
 
 from utils import load_dataset, assign_random_data_to_clients, corrcoef_numpy
@@ -51,7 +50,8 @@ def parse_args():
     parser.add_argument('--clip_local', type=float, default=None)
     parser.add_argument('--output_csv', type=str, default='results.csv')
     parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu')
-    parser.add_argument('--topology', type=str, default='ring', choices=['ring','full','random','watts','barabasi'])
+    parser.add_argument('--topology', type=str, default='ring', choices=['ring','full','random','watts','barabasi','regular'])
+    parser.add_argument('--degree_for_regular', type=int, default=2)
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--k', type=int, default=2)
     parser.add_argument('--m', type=int, default=2)
@@ -68,6 +68,8 @@ def build_topology(args):
     if args.topology == 'random': return nx.erdos_renyi_graph(n, p=args.k/n, seed=seed)
     if args.topology == 'watts': return nx.watts_strogatz_graph(n, k=args.k, p=0.1, seed=seed)
     if args.topology == 'barabasi': return nx.barabasi_albert_graph(n, args.m, seed=seed)
+    if args.topology == 'regular':
+        return nx.random_regular_graph(d=args.degree_for_regular, n=n)
     raise ValueError('Unknown topology')
 
 def save_topology(topo, run_dir, rel_path):
